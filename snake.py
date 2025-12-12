@@ -1,191 +1,139 @@
-import curses
+import pygame
+import time
 import random
-import sys
-import os
 
-# Try to import curses. If it fails on Windows, give a helpful message.
-try:
-    import curses
-except ImportError:
-    if os.name == 'nt':
-        print("Error: The 'curses' module is not installed.")
-        print("Please install it by running: pip install windows-curses")
-        sys.exit(1)
-    else:
-        print("Error: The 'curses' module is missing.")
-        sys.exit(1)
+# Initialize Pygame
+pygame.init()
 
-def create_food(snake, box_height, box_width, start_y, start_x):
-    """
-    Generate a new food location that is not part of the snake body.
-    box_height, box_width: Dimensions of the playable area.
-    start_y, start_x: Top-left corner of the playable area.
-    """
-    snake_positions = set(tuple(pos) for pos in snake)
-    while True:
-        # Generate random coordinates within the game boundaries (excluding borders)
-        food_y = random.randint(start_y + 1, start_y + box_height - 2)
-        food_x = random.randint(start_x + 1, start_x + box_width - 2)
-        
-        if (food_y, food_x) not in snake_positions:
-            return [food_y, food_x]
+# Box / Window Dimensions
+WIDTH = 800
+HEIGHT = 600
+win = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Snake Game by Antigravity")
 
-def main(stdscr):
-    # 1. Setup Screen
-    curses.curs_set(0)        # Hide the cursor
-    stdscr.nodelay(1)         # Make getch() non-blocking
-    stdscr.timeout(100)       # Refresh every 100ms (controls game speed)
-    
-    # Enable Colors if supported
-    if curses.has_colors():
-        curses.start_color()
-        # Pair 1: Green text on Black background (Snake)
-        curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        # Pair 2: Red text on Black background (Food)
-        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
-        # Pair 3: White text on Black background (Border/Text)
-        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
-    
-    # Get Screen Dimensions
-    sh, sw = stdscr.getmaxyx()
-    
-    # To ensure the game fits in most terminals and looks neat, let's define a game box.
-    # We will use the full screen but keep a margin or just use the full dimension provided.
-    # Writing to the absolute bottom-right char often causes error in curses, so we reduce by 1.
-    box_h = sh
-    box_w = sw
-    
-    # Initialize Snake (start in the middle)
-    # Snake is a list of [y, x] coordinates. Head is at index 0.
-    snk_y = box_h // 2
-    snk_x = box_w // 4
-    snake = [
-        [snk_y, snk_x],
-        [snk_y, snk_x - 1],
-        [snk_y, snk_x - 2]
-    ]
-    
-    # Initialize separate colors for snake head and body if desired, 
-    # but for simplicity we use Green for the whole snake.
+# Colors
+WHITE = (255, 255, 255)
+YELLOW = (255, 255, 102)
+BLACK = (0, 0, 0)
+RED = (213, 50, 80)
+GREEN = (0, 255, 0)
+BLUE = (50, 153, 213)
+
+# Snake Settings
+SNAKE_BLOCK = 10
+SNAKE_SPEED = 15
+
+# Fonts
+font_style = pygame.font.SysFont("bahnschrift", 25)
+score_font = pygame.font.SysFont("comicsansms", 35)
+
+def your_score(score):
+    value = score_font.render("Score: " + str(score), True, YELLOW)
+    win.blit(value, [0, 0])
+
+def message(msg, color, y_offset=0):
+    mesg = font_style.render(msg, True, color)
+    # Center the message
+    text_rect = mesg.get_rect(center=(WIDTH/2, HEIGHT/2 + y_offset))
+    win.blit(mesg, text_rect)
+
+def gameLoop():
+    game_over = False
+    game_close = False
+
+    # Starting Position
+    x1 = WIDTH / 2
+    y1 = HEIGHT / 2
+
+    x1_change = 0
+    y1_change = 0
+
+    snake_List = []
+    Length_of_snake = 1
 
     # Place initial food
-    food = create_food(snake, box_h, box_w, 0, 0)
-    
-    # Initial Direction
-    key = curses.KEY_RIGHT
-    
-    # Score
-    score = 0
-    
-    # 2. Game Loop
-    while True:
-        # --- Draw Phase ---
-        stdscr.clear()
+    foodx = round(random.randrange(0, WIDTH - SNAKE_BLOCK) / 10.0) * 10.0
+    foody = round(random.randrange(0, HEIGHT - SNAKE_BLOCK) / 10.0) * 10.0
+
+    clock = pygame.time.Clock()
+
+    while not game_over:
+
+        while game_close == True:
+            win.fill(BLACK)
+            message("You Lost! Press C-Play Again or Q-Quit", RED, -20)
+            message(f"Final Score: {Length_of_snake - 1}", WHITE, 20)
+            your_score(Length_of_snake - 1)
+            pygame.display.update()
+
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_q:
+                        game_over = True
+                        game_close = False
+                    if event.key == pygame.K_c:
+                        gameLoop()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game_over = True
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT and x1_change != SNAKE_BLOCK:
+                    x1_change = -SNAKE_BLOCK
+                    y1_change = 0
+                elif event.key == pygame.K_RIGHT and x1_change != -SNAKE_BLOCK:
+                    x1_change = SNAKE_BLOCK
+                    y1_change = 0
+                elif event.key == pygame.K_UP and y1_change != SNAKE_BLOCK:
+                    y1_change = -SNAKE_BLOCK
+                    x1_change = 0
+                elif event.key == pygame.K_DOWN and y1_change != -SNAKE_BLOCK:
+                    y1_change = SNAKE_BLOCK
+                    x1_change = 0
+
+        # Boundary Check
+        if x1 >= WIDTH or x1 < 0 or y1 >= HEIGHT or y1 < 0:
+            game_close = True
         
-        # Draw Border
-        stdscr.attron(curses.color_pair(3))
-        # border(ls, rs, ts, bs, tl, tr, bl, br)
-        # We handle drawing manually to avoid issues with some terminals or simple box()
-        stdscr.border(0) 
-        
-        # Display Score and Title
-        title = f" SNAKE GAME - Score: {score} "
-        # Center the title at the top border
-        stdscr.addstr(0, (box_w // 2) - (len(title) // 2), title, curses.color_pair(3) | curses.A_BOLD)
-        stdscr.attroff(curses.color_pair(3))
+        x1 += x1_change
+        y1 += y1_change
+        win.fill(BLACK)
         
         # Draw Food
-        stdscr.addch(food[0], food[1], '●', curses.color_pair(2) | curses.A_BOLD)
+        pygame.draw.rect(win, RED, [foodx, foody, SNAKE_BLOCK, SNAKE_BLOCK])
         
+        # Snake Movement Logic
+        snake_Head = []
+        snake_Head.append(x1)
+        snake_Head.append(y1)
+        snake_List.append(snake_Head)
+        
+        if len(snake_List) > Length_of_snake:
+            del snake_List[0]
+
+        # Self Collision Check
+        for x in snake_List[:-1]:
+            if x == snake_Head:
+                game_close = True
+
         # Draw Snake
-        for i, point in enumerate(snake):
-            y, x = point
-            # Head drawn slightly differently (optional) or just same
-            char = 'O' if i == 0 else 'o'
-            stdscr.addch(y, x, char, curses.color_pair(1))
-            
-        # Refresh screen to show changes
-        stdscr.refresh()
-        
-        # --- Input Phase ---
-        next_key = stdscr.getch()
-        
-        # If no key is pressed, keep going in same direction
-        # If key is pressed, update direction, but prevent 180 degree turns
-        if next_key != -1:
-            if (next_key == curses.KEY_DOWN and key != curses.KEY_UP) or \
-               (next_key == curses.KEY_UP and key != curses.KEY_DOWN) or \
-               (next_key == curses.KEY_LEFT and key != curses.KEY_RIGHT) or \
-               (next_key == curses.KEY_RIGHT and key != curses.KEY_LEFT):
-                key = next_key
-            # Support WASD
-            elif (next_key == ord('s') and key != curses.KEY_UP): key = curses.KEY_DOWN
-            elif (next_key == ord('w') and key != curses.KEY_DOWN): key = curses.KEY_UP
-            elif (next_key == ord('a') and key != curses.KEY_RIGHT): key = curses.KEY_LEFT
-            elif (next_key == ord('d') and key != curses.KEY_LEFT): key = curses.KEY_RIGHT
-            # Exit Key
-            elif next_key == 27: # ESC
-                break
+        for x in snake_List:
+            pygame.draw.rect(win, GREEN, [x[0], x[1], SNAKE_BLOCK, SNAKE_BLOCK])
 
-        # --- Logic Phase ---
-        # Calculate new head position
-        head = snake[0]
-        if key == curses.KEY_DOWN:
-            new_head = [head[0] + 1, head[1]]
-        elif key == curses.KEY_UP:
-            new_head = [head[0] - 1, head[1]]
-        elif key == curses.KEY_LEFT:
-            new_head = [head[0], head[1] - 1]
-        elif key == curses.KEY_RIGHT:
-            new_head = [head[0], head[1] + 1]
-            
-        # Check Collision with Walls
-        # Borders are at 0 and box_h-1, 0 and box_w-1
-        # Playable area is 1 to box_h-2, 1 to box_w-2
-        if (new_head[0] <= 0 or new_head[0] >= box_h - 1 or
-            new_head[1] <= 0 or new_head[1] >= box_w - 1):
-            break
-            
-        # Check Collision with Self
-        if new_head in snake:
-            break
-            
-        # Move Snake
-        snake.insert(0, new_head)
-        
-        # Check Food Consumption
-        if new_head == food:
-            score += 1
-            # Increase speed slightly every 5 points (optional, keeps it interesting)
-            # timer = getattr(stdscr, 'timeout') # Not directly accessible easily, skip for simplicity or use manual variable
-            food = create_food(snake, box_h, box_w, 0, 0)
-        else:
-            # If food not eaten, remove tail to maintain length
-            snake.pop()
+        your_score(Length_of_snake - 1)
 
-    # --- Game Over ---
-    stdscr.nodelay(0) # Switch back to blocking input
-    
-    # Show Game Over Message
-    msg_lines = [
-        "GAME OVER",
-        f"Final Score: {score}",
-        "",
-        "Press any key to exit..."
-    ]
-    
-    # Calculate center position
-    center_y = box_h // 2 - len(msg_lines) // 2
-    
-    # Draw a box for the message
-    for i, line in enumerate(msg_lines):
-        center_x = box_w // 2 - len(line) // 2
-        stdscr.addstr(center_y + i, center_x, line, curses.color_pair(3) | curses.A_BOLD)
-    
-    stdscr.refresh()
-    stdscr.getch() # Wait for input
+        pygame.display.update()
+
+        # Check if ate food
+        if x1 == foodx and y1 == foody:
+            foodx = round(random.randrange(0, WIDTH - SNAKE_BLOCK) / 10.0) * 10.0
+            foody = round(random.randrange(0, HEIGHT - SNAKE_BLOCK) / 10.0) * 10.0
+            Length_of_snake += 1
+
+        clock.tick(SNAKE_SPEED)
+
+    pygame.quit()
+    quit()
 
 if __name__ == "__main__":
-    # Check for windows-curses on Windows
-    # (The check at top handles the import error, but we can't automate install inside script easily without subproccess)
-    curses.wrapper(main)
+    gameLoop()
